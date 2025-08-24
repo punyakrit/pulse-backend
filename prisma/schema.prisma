@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Alert {
+  id         String    @id
+  websiteId  String
+  message    String
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  Website    Website   @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+}
+
+model Check {
+  id           String   @id
+  status       Boolean
+  responseTime Int?
+  websiteId    String
+  errorMessage String?
+  checkedAt    DateTime @default(now())
+  Website      Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id        String    @id
+  name      String
+  userId    String
+  createdAt DateTime  @default(now())
+  status    String    @default("offline")
+  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Setting   Setting?
+  Website   Website[]
+}
+
+model Setting {
+  id         String   @id
+  projectId  String   @unique
+  status     Boolean  @default(true)
+  interval   Int      @default(300)
+  notifyType String   @default("email")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  Project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id        String    @id
+  email     String    @unique
+  name      String?
+  createdAt DateTime  @default(now())
+  Project   Project[]
+}
+
+model Website {
+  id        String   @id
+  url       String
+  projectId String
+  createdAt DateTime @default(now())
+  Alert     Alert[]
+  Check     Check[]
+  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
