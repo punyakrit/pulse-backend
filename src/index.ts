@@ -152,11 +152,21 @@ async function monitorWebsite(website: any, project: any) {
       await updateProject(project.projectId, { 
         status: 'online'
       })
+      
+      // Resolve any existing alerts when website comes back online
+      await prisma.alert.updateMany({
+        where: {
+          websiteId: website.id,
+          resolvedAt: null
+        },
+        data: {
+          resolvedAt: new Date()
+        }
+      })
+      
       console.log(`[${project.projectName}] ${website.url}: UP (${responseTime}ms) - Status: ${response.status}`)
     } else {
-      await updateProject(project.projectId, { 
-        status: 'offline'
-      })
+     
       await alertWebsite(website.id, {
         message: `Website ${website.url} is down`
       })
@@ -181,12 +191,13 @@ async function monitorWebsite(website: any, project: any) {
     // Note: Website model doesn't have status, lastCheckAt, totalChecks, failedChecks fields
     // These statistics are calculated from the Check table instead
 
-    await updateProject(project.projectId, { 
-      status: 'offline'
-    })
+   
     await alertWebsite(website.id, {
       message: `Website ${website.url} is unreachable`
     })
+    
+    // Note: We don't resolve alerts here because the website is still down
+    // Alerts will be resolved when the website comes back online
   }
 }
 
