@@ -20,29 +20,46 @@ async function main() {
 function startCron() {
   const job = new cron.CronJob('*/30 * * * * *', async () => {
     const response = await findAllWebsites()
-    if (JSON.stringify(response) === JSON.stringify(websites)) {
-      console.log('No changes')
-    } else {
+    
+    // More detailed change detection
+    const hasChanges = JSON.stringify(response) !== JSON.stringify(websites)
+    
+    if (hasChanges) {
+      console.log('Database changes detected!')
+      console.log('Previous websites count:', websites.length)
+      console.log('New websites count:', response.length)
+      
+      // Log URL changes for debugging
+      response.forEach((project: any) => {
+        project.Website.forEach((website: any) => {
+          const oldProject = websites.find((p: any) => p.id === project.id)
+          const oldWebsite = oldProject?.Website.find((w: any) => w.id === website.id)
+          if (oldWebsite && oldWebsite.url !== website.url) {
+            console.log(`URL changed for website ${website.id}: ${oldWebsite.url} -> ${website.url}`)
+          }
+        })
+      })
+      
       websites = response
       console.log('Updated websites:', websites.length, 'projects')
       checkWebsites()
+    } else {
+      console.log('No changes')
     }
   })
   job.start()
 
-  const dailyUptimeJob = new cron.CronJob('0 0 * * *', async () => {
-    console.log('Calculating daily uptime statistics...')
-    await calculateDailyUptime()
+  const uptimeJob = new cron.CronJob('0 */5 * * * *', async () => {
+    console.log('Calculating uptime statistics every 5 minutes...')
+    await calculateUptime()
   })
-  dailyUptimeJob.start()
+  uptimeJob.start()
 }
 
 
 
 async function checkWebsites() {
-  const isActive = websites.filter((website) => website.status === 'online')
-
-  const websiteExists = isActive.filter((website) => website.Website.length > 0)
+  const websiteExists = websites.filter((website) => website.Website.length > 0)
 
   const websitesToMonitor = websiteExists.map((project) => ({
     projectId: project.id,
@@ -55,7 +72,6 @@ async function checkWebsites() {
     }))
   }))
 
-
   setupMonitoringJobs(websitesToMonitor)
 }
 
@@ -64,7 +80,7 @@ function setupMonitoringJobs(websitesToMonitor: any[]) {
   
   websitesToMonitor.forEach((project) => {
     project.websites.forEach((website: any) => {
-      const jobKey = `${website.id}-${project.interval}`
+      const jobKey = `${website.id}-${website.url}-${project.interval}`
       newJobKeys.add(jobKey)
       
       if (activeJobs.has(jobKey)) {
@@ -100,7 +116,7 @@ function setupMonitoringJobs(websitesToMonitor: any[]) {
 
       job.start()
       activeJobs.set(jobKey, job)
-      console.log(`Started monitoring ${website.url} every ${project.interval} seconds (${cronExpression})`)
+      console.log(`Started monitoring ${website.url} every ${project.interval} seconds (${cronExpression}) - Job Key: ${jobKey}`)
     })
   })
   
@@ -111,6 +127,8 @@ function setupMonitoringJobs(websitesToMonitor: any[]) {
       console.log(`Stopped monitoring job: ${key}`)
     }
   })
+  
+  console.log(`Active jobs after update: ${activeJobs.size}`)
 }
 
 async function monitorWebsite(website: any, project: any) {
@@ -201,14 +219,12 @@ async function monitorWebsite(website: any, project: any) {
   }
 }
 
-async function calculateDailyUptime() {
+async function calculateUptime() {
   try {
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    yesterday.setHours(0, 0, 0, 0)
+    const fiveMinutesAgo = new Date()
+    fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5)
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const now = new Date()
 
     const websites = await findAllWebsites()
     
@@ -218,8 +234,8 @@ async function calculateDailyUptime() {
           where: {
             websiteId: website.id,
             checkedAt: {
-              gte: yesterday,
-              lt: today
+              gte: fiveMinutesAgo,
+              lt: now
             }
           }
         })
@@ -233,7 +249,7 @@ async function calculateDailyUptime() {
           const avgResponseTime = checks.reduce((sum, check) => sum + (check.responseTime || 0), 0) / totalChecks
 
           await createUptimeLog(website.id, {
-            date: yesterday,
+            date: fiveMinutesAgo,
             uptime,
             downtime,
             checks: totalChecks,
@@ -241,12 +257,12 @@ async function calculateDailyUptime() {
             avgResponseTime
           })
 
-          console.log(`Daily uptime for ${website.url}: ${uptime.toFixed(2)}%`)
+          console.log(`5-minute uptime for ${website.url}: ${uptime.toFixed(2)}% (${totalChecks} checks)`)
         }
       }
     }
   } catch (error) {
-    console.error('Error calculating daily uptime:', error)
+    console.error('Error calculating uptime:', error)
   }
 }
 
