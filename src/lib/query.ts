@@ -23,7 +23,7 @@ export async function updateProject(projectId: string, data: any) {
 }
 
 
-export async function checkWebsite(websiteId: string, data:any) {
+export async function checkWebsite(websiteId: string, data: any) {
     const check = await prisma.check.create({
         data: {
             websiteId: websiteId,
@@ -31,4 +31,37 @@ export async function checkWebsite(websiteId: string, data:any) {
         }
     });
     return check;
+}
+
+
+
+export async function createPerformanceMetric(websiteId: string, data: any) {
+    const metric = await prisma.performanceMetric.create({
+        data: {
+            websiteId: websiteId,
+            ...data
+        }
+    });
+    return metric;
+}
+
+export async function createUptimeLog(websiteId: string, data: any) {
+    const log = await prisma.uptimeLog.create({
+        data: {
+            websiteId: websiteId,
+            ...data
+        }
+    });
+    return log;
+}
+
+
+export async function alertWebsite(websiteId: string, data: any) {
+    const alert = await prisma.alert.create({
+        data: {
+            websiteId: websiteId,
+            ...data
+        }
+    });
+    return alert;
 }

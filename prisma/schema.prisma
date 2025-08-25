@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Alert {
-  id         String    @id
+  id         String    @id @default(uuid())
   websiteId  String
   message    String
   createdAt  DateTime  @default(now())
@@ -20,9 +20,17 @@ model Check {
   id           String   @id @default(uuid())
   status       Boolean
   responseTime Int?
+  statusCode   Int?
   websiteId    String
   errorMessage String?
+  errorType    String?
   checkedAt    DateTime @default(now())
+  headers      Json?
+  contentSize  Int?
+  sslValid     Boolean?
+  dnsTime      Int?
+  connectTime  Int?
+  transferTime Int?
   Website      Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 }
 
@@ -63,5 +71,33 @@ model Website {
   createdAt DateTime @default(now())
   Alert     Alert[]
   Check     Check[]
+  UptimeLog UptimeLog[]
+  PerformanceMetric PerformanceMetric[]
   Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model UptimeLog {
+  id        String   @id @default(uuid())
+  websiteId String
+  date      DateTime
+  uptime    Float
+  downtime  Float
+  checks    Int
+  failures  Int
+  avgResponseTime Float
+  Website         Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  }
+
+model PerformanceMetric {
+  id        String   @id @default(uuid())
+  websiteId String
+  timestamp DateTime @default(now())
+  responseTime Int
+  statusCode Int
+  contentSize Int?
+  sslValid  Boolean?
+  dnsTime   Int?
+  connectTime Int?
+  transferTime Int?
+  Website   Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 }
