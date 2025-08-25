@@ -17,7 +17,7 @@ model Alert {
 }
 
 model Check {
-  id           String   @id
+  id           String   @id @default(uuid())
   status       Boolean
   responseTime Int?
   websiteId    String

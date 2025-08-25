@@ -14,3 +14,21 @@ export async function findAllWebsites() {
 }
 
 
+export async function updateProject(projectId: string, data: any) {
+    const project = await prisma.project.update({
+        where: { id: projectId },
+        data
+    });
+    return project;
+}
+
+
+export async function checkWebsite(websiteId: string, data:any) {
+    const check = await prisma.check.create({
+        data: {
+            websiteId: websiteId,
+            ...data
+        }
+    });
+    return check;
+}
