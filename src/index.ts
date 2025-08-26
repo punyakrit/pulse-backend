@@ -52,8 +52,8 @@ function startCron() {
   })
   job.start()
 
-  const uptimeJob = new cron.CronJob('0 */5 * * * *', async () => {
-    console.log('Calculating uptime statistics every 5 minutes...')
+  const uptimeJob = new cron.CronJob('0 */30 * * * *', async () => {
+    console.log('Calculating uptime statistics every 30 minutes...')
     await calculateUptime()
   })
   uptimeJob.start()
@@ -258,7 +258,7 @@ async function monitorWebsite(website: any, project: any) {
 async function calculateUptime() {
   try {
     const fiveMinutesAgo = new Date()
-    fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5)
+    fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 30)
 
     const now = new Date()
 
@@ -293,7 +293,7 @@ async function calculateUptime() {
             avgResponseTime
           })
 
-          console.log(`5-minute uptime for ${website.url}: ${uptime.toFixed(2)}% (${totalChecks} checks)`)
+          console.log(`30-minute uptime for ${website.url}: ${uptime.toFixed(2)}% (${totalChecks} checks)`)
         }
       }
     }
