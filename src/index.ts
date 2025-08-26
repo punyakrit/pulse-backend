@@ -3,11 +3,14 @@ import { checkWebsite, findAllWebsites, updateProject, createPerformanceMetric, 
 import cron from 'cron';
 import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
+import { Resend } from 'resend';
 
 const app = express();
 const prisma = new PrismaClient();
 
 let websites: any[] = []
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 let activeJobs: Map<string, cron.CronJob> = new Map()
 
 async function main() {
@@ -266,8 +269,25 @@ async function calculateUptime() {
   }
 }
 
+
+async function sendAlertEmail(website: any, project: any) {
+  const { data, error } = await resend.emails.send({
+    from: 'jaat.cp@gmail.com',
+    to: ['punyakritsinghmakhni@gmail.com'],
+    subject: `Website ${website.url} is down`,
+    html: `<strong>Website ${website.url} is down</strong>`,
+  });
+
+  if (error) {
+    return console.error({ error });
+  }
+  
+
+}
+
 app.listen(8000, async () => {
+  await sendAlertEmail({url: 'https://www.google.com'}, {projectName: 'Google'})
   console.log('Server is running on port 8000')
-  await main()
-  startCron()
+  // await main()
+  // startCron()
 })
