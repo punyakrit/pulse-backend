@@ -64,16 +64,19 @@ function startCron() {
 async function checkWebsites() {
   const websiteExists = websites.filter((website) => website.Website.length > 0)
 
-  const websitesToMonitor = websiteExists.map((project) => ({
-    projectId: project.id,
-    projectName: project.name,
-    interval: project.Setting?.interval,
-    notifyType: project.Setting?.notifyType,
-    websites: project.Website.map((website: any) => ({
-      id: website.id,
-      url: website.url
+  const websitesToMonitor = websiteExists
+    .filter((project) => project.Setting?.status !== false)
+    .map((project) => ({
+      projectId: project.id,
+      projectName: project.name,
+      interval: project.Setting?.interval,
+      notifyType: project.Setting?.notifyType,
+      status: project.Setting?.status,
+      websites: project.Website.map((website: any) => ({
+        id: website.id,
+        url: website.url
+      }))
     }))
-  }))
 
   setupMonitoringJobs(websitesToMonitor)
 }
@@ -142,6 +145,15 @@ async function monitorWebsite(website: any, project: any) {
 
     if (!websiteExists) {
       console.log(`[${project.projectName}] Website ${website.url} (ID: ${website.id}) no longer exists in database. Stopping monitoring.`)
+      return
+    }
+
+    const projectSetting = await prisma.setting.findUnique({
+      where: { projectId: project.projectId }
+    })
+
+    if (projectSetting?.status === false) {
+      console.log(`[${project.projectName}] Monitoring is disabled for this project. Skipping check.`)
       return
     }
 
