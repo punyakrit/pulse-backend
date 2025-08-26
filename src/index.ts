@@ -136,6 +136,15 @@ function setupMonitoringJobs(websitesToMonitor: any[]) {
 
 async function monitorWebsite(website: any, project: any) {
   try {
+    const websiteExists = await prisma.website.findUnique({
+      where: { id: website.id }
+    })
+
+    if (!websiteExists) {
+      console.log(`[${project.projectName}] Website ${website.url} (ID: ${website.id}) no longer exists in database. Stopping monitoring.`)
+      return
+    }
+
     const startTime = Date.now()
     
     const response = await axios.get(website.url, {
@@ -204,6 +213,15 @@ async function monitorWebsite(website: any, project: any) {
 
   } catch (error: any) {
     console.log(`[${project.projectName}] ${website.url}: ERROR - ${error.message}`)
+    
+    const websiteExists = await prisma.website.findUnique({
+      where: { id: website.id }
+    })
+
+    if (!websiteExists) {
+      console.log(`[${project.projectName}] Website ${website.url} (ID: ${website.id}) no longer exists in database. Stopping monitoring.`)
+      return
+    }
     
     const errorType = error.code === 'ECONNABORTED' ? 'timeout' : 
                      error.code === 'ENOTFOUND' ? 'dns_error' : 
