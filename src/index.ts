@@ -166,15 +166,11 @@ async function monitorWebsite(website: any, project: any) {
 
     await createPerformanceMetric(website.id, performanceData)
 
-    // Note: Website model doesn't have status, lastCheckAt, totalChecks, failedChecks, avgResponseTime fields
-    // These statistics are calculated from the Check table instead
-
     if (isHealthy) {
       await updateProject(project.projectId, { 
         status: 'online'
       })
       
-      // Resolve any existing alerts when website comes back online
       await prisma.alert.updateMany({
         where: {
           websiteId: website.id,
@@ -187,11 +183,23 @@ async function monitorWebsite(website: any, project: any) {
       
       console.log(`[${project.projectName}] ${website.url}: UP (${responseTime}ms) - Status: ${response.status}`)
     } else {
-     
-      await alertWebsite(website.id, {
-        message: `Website ${website.url} is down`
+      const existingAlert = await prisma.alert.findFirst({
+        where: {
+          websiteId: website.id,
+          resolvedAt: null
+        }
       })
-      console.log(`[${project.projectName}] ${website.url}: DOWN (${responseTime}ms) - Status: ${response.status}`)
+
+      if (!existingAlert) {
+        await alertWebsite(website.id, {
+          message: `Website ${website.url} is down`
+        })
+        
+        await sendAlertEmail(website, project)
+        console.log(`[${project.projectName}] ${website.url}: DOWN (${responseTime}ms) - Status: ${response.status} - Alert sent`)
+      } else {
+        console.log(`[${project.projectName}] ${website.url}: DOWN (${responseTime}ms) - Status: ${response.status} - Alert already exists`)
+      }
     }
 
   } catch (error: any) {
@@ -209,16 +217,23 @@ async function monitorWebsite(website: any, project: any) {
       errorType: errorType
     })
 
-    // Note: Website model doesn't have status, lastCheckAt, totalChecks, failedChecks fields
-    // These statistics are calculated from the Check table instead
-
-   
-    await alertWebsite(website.id, {
-      message: `Website ${website.url} is unreachable`
+    const existingAlert = await prisma.alert.findFirst({
+      where: {
+        websiteId: website.id,
+        resolvedAt: null
+      }
     })
-    
-    // Note: We don't resolve alerts here because the website is still down
-    // Alerts will be resolved when the website comes back online
+
+    if (!existingAlert) {
+      await alertWebsite(website.id, {
+        message: `Website ${website.url} is unreachable`
+      })
+      
+      await sendAlertEmail(website, project)
+      console.log(`[${project.projectName}] ${website.url}: ERROR - Alert sent`)
+    } else {
+      console.log(`[${project.projectName}] ${website.url}: ERROR - Alert already exists`)
+    }
   }
 }
 
@@ -271,13 +286,210 @@ async function calculateUptime() {
 
 
 async function sendAlertEmail(website: any, project: any) {
+  console.log("website", website)
+  console.log("project", project)
+  const getUserId = await prisma.project.findFirst({
+    where: {
+      id: project.projectId
+    },
+    select: {
+      userId: true
+    }
+  })
+
+  const userEmail = await prisma.user.findFirst({
+    where: {
+      id: getUserId?.userId || ''
+    },
+    select: {
+      email: true
+    }
+  })
+
+  console.log("userEmail", userEmail)
+  
   const { data, error } = await resend.emails.send({
-    from: 'jaat.cp@gmail.com',
-    to: ['punyakritsinghmakhni@gmail.com'],
-    subject: `Website ${website.url} is down`,
-    html: `<strong>Website ${website.url} is down</strong>`,
+    from: 'alerts@pulse.punyakrit.dev',
+    to: [userEmail?.email || ''],
+    subject: `🚨 Alert: ${website.url} is down`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Website Alert</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+            color: #1e293b;
+          }
+          .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-top: 20px;
+            margin-bottom: 20px;
+          }
+          .header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+          }
+          .alert-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+          }
+          .content {
+            padding: 32px 24px;
+          }
+          .status-badge {
+            display: inline-block;
+            background-color: #fef2f2;
+            color: #dc2626;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid #fecaca;
+          }
+          .website-info {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+          }
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+          }
+          .info-row:last-child {
+            margin-bottom: 0;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #64748b;
+            font-size: 14px;
+          }
+          .info-value {
+            font-weight: 500;
+            color: #1e293b;
+            font-size: 14px;
+          }
+          .url-display {
+            background-color: #f1f5f9;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            color: #475569;
+            word-break: break-all;
+          }
+          .timestamp {
+            text-align: center;
+            color: #64748b;
+            font-size: 12px;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+          }
+          .footer {
+            background-color: #f8fafc;
+            padding: 20px 24px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+          }
+          .footer p {
+            margin: 0;
+            color: #64748b;
+            font-size: 12px;
+          }
+          .brand {
+            color: #3b82f6;
+            font-weight: 600;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="alert-icon">🚨</div>
+            <h1>Website Alert</h1>
+          </div>
+          
+          <div class="content">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <span class="status-badge">Down</span>
+            </div>
+            
+            <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 18px;">
+              Website is currently unavailable
+            </h2>
+            
+            <p style="margin: 0 0 24px 0; color: #64748b; line-height: 1.6;">
+              Our monitoring system has detected that the following website is not responding properly.
+            </p>
+            
+            <div class="website-info">
+              <div class="info-row">
+                <span class="info-label">Project:</span>
+                <span class="info-value">${project.projectName || 'Unknown Project'}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value" style="color: #dc2626; font-weight: 600;">Offline</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">URL:</span>
+              </div>
+              <div class="url-display">${website.url}</div>
+            </div>
+            
+            <div class="timestamp">
+              Alert triggered at ${new Date().toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+              })}
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p>
+              This alert was sent by <span class="brand">Pulse</span> monitoring system
+            </p>
+            <p style="margin-top: 8px;">
+              You can manage your alert preferences in your dashboard
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
   });
 
+  console.log("Alert Email Sent for ", website.url)
   if (error) {
     return console.error({ error });
   }
@@ -286,8 +498,8 @@ async function sendAlertEmail(website: any, project: any) {
 }
 
 app.listen(8000, async () => {
-  await sendAlertEmail({url: 'https://www.google.com'}, {projectName: 'Google'})
+  // await sendAlertEmail({url: 'https://www.google.com'}, {projectName: 'Google'})
   console.log('Server is running on port 8000')
-  // await main()
-  // startCron()
+  await main()
+  startCron()
 })
