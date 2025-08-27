@@ -269,12 +269,37 @@ async function monitorWebsite(website: any, project: any) {
 
 async function calculateUptime() {
   try {
+    console.log('Starting uptime calculation and database cleanup...')
+    
     const fiveMinutesAgo = new Date()
     fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 30)
 
     const now = new Date()
+    
+    const oneDayAgo = new Date()
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1)
 
     const websites = await findAllWebsites()
+    
+    console.log('Cleaning up old check records (older than   1 day)...')
+    const deletedChecks = await prisma.check.deleteMany({
+      where: {
+        checkedAt: {
+          lt: oneDayAgo
+        }
+      }
+    })
+    console.log(`Deleted ${deletedChecks.count} old check records`)
+    
+    console.log('Cleaning up old performance metrics (older than 1 days)...')
+    const deletedMetrics = await prisma.performanceMetric.deleteMany({
+      where: {
+        timestamp: {
+          lt: oneDayAgo
+        }
+      }
+    })
+    console.log(`Deleted ${deletedMetrics.count} old performance metrics`)
     
     for (const project of websites) {
       for (const website of project.Website) {
