@@ -281,25 +281,13 @@ async function calculateUptime() {
 
     const websites = await findAllWebsites()
     
-    console.log('Cleaning up old check records (older than   1 day)...')
-    const deletedChecks = await prisma.check.deleteMany({
-      where: {
-        checkedAt: {
-          lt: oneDayAgo
-        }
-      }
-    })
-    console.log(`Deleted ${deletedChecks.count} old check records`)
+    console.log('Cleaning up all check records...')
+    const deletedChecks = await prisma.check.deleteMany({})
+    console.log(`Deleted ${deletedChecks.count} check records`)
     
-    console.log('Cleaning up old performance metrics (older than 1 days)...')
-    const deletedMetrics = await prisma.performanceMetric.deleteMany({
-      where: {
-        timestamp: {
-          lt: oneDayAgo
-        }
-      }
-    })
-    console.log(`Deleted ${deletedMetrics.count} old performance metrics`)
+    console.log('Cleaning up all performance metrics...')
+    const deletedMetrics = await prisma.performanceMetric.deleteMany({})
+    console.log(`Deleted ${deletedMetrics.count} performance metrics`)
     
     for (const project of websites) {
       for (const website of project.Website) {
